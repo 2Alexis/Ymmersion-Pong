@@ -12,6 +12,7 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
     private int ballXSpeed = 5, ballYSpeed = 5;
     private int ScoreP1 = 0;
     private int ScoreP2 = 0;
+    private int BonusType; 
 
     private final int MAX_SCORE = 10;  // Limite du score
 
@@ -24,6 +25,7 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
     private Timer paddle1MoveTimer;
     private Timer paddle2MoveTimer;
     private Timer bonusTimer;
+    private Timer malusTimer;  // Timer pour la durée du malus
 
     private boolean paddle1MovingUp = false, paddle1MovingDown = false;
     private boolean paddle2MovingUp = false, paddle2MovingDown = false;
@@ -32,6 +34,8 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
 
     // Variable pour suivre quel paddle a touché la balle en dernier
     private boolean lastHitByPaddle1 = false; 
+    private boolean controlsInvertedPaddle1 = false; // Inversion des contrôles du paddle 1
+    private boolean controlsInvertedPaddle2 = false; // Inversion des contrôles du paddle 2
 
     public PongGame() {
         this.setPreferredSize(new Dimension(500, 300));
@@ -117,21 +121,39 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
 
     // Méthode pour déplacer la paddle 1 en fonction de la direction
     private void movePaddle1() {
-        if (paddle1MovingUp && paddle1Y > 0) {
-            paddle1Y -= 5;
-        }
-        if (paddle1MovingDown && paddle1Y < getHeight() - paddle1Height) {
-            paddle1Y += 5;
+        if (controlsInvertedPaddle1) {  // Vérifier si les contrôles sont inversés
+            if (paddle1MovingDown && paddle1Y > 0) {
+                paddle1Y -= 5;  // Inverser le mouvement
+            }
+            if (paddle1MovingUp && paddle1Y < getHeight() - paddle1Height) {
+                paddle1Y += 5;  // Inverser le mouvement
+            }
+        } else {
+            if (paddle1MovingUp && paddle1Y > 0) {
+                paddle1Y -= 5;
+            }
+            if (paddle1MovingDown && paddle1Y < getHeight() - paddle1Height) {
+                paddle1Y += 5;
+            }
         }
     }
 
     // Méthode pour déplacer la paddle 2 en fonction de la direction
     private void movePaddle2() {
-        if (paddle2MovingUp && paddle2Y > 0) {
-            paddle2Y -= 5;
-        }
-        if (paddle2MovingDown && paddle2Y < getHeight() - paddle2Height) {
-            paddle2Y += 5;
+        if (controlsInvertedPaddle2) {  // Vérifier si les contrôles sont inversés
+            if (paddle2MovingDown && paddle2Y > 0) {
+                paddle2Y -= 5;  // Inverser le mouvement
+            }
+            if (paddle2MovingUp && paddle2Y < getHeight() - paddle2Height) {
+                paddle2Y += 5;  // Inverser le mouvement
+            }
+        } else {
+            if (paddle2MovingUp && paddle2Y > 0) {
+                paddle2Y -= 5;
+            }
+            if (paddle2MovingDown && paddle2Y < getHeight() - paddle2Height) {
+                paddle2Y += 5;
+            }
         }
     }
 
@@ -155,24 +177,53 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
     public void spawnBonus() {
         bonusX = random.nextInt(getWidth() - bonusWidth);
         bonusY = random.nextInt(getHeight() - bonusHeight);
+        BonusType = random.nextInt(5);
         isBonus = random.nextBoolean();  // Choisir si c'est un bonus ou un malus
         bonusActive = true;  // Activer le bonus/malus
     }
 
     // Appliquer les effets du bonus ou malus
     public void applyBonusOrMalus() {
-        if (isBonus) {
-            // Appliquer un bonus : augmenter la vitesse de la balle
-            ballXSpeed += 2;
-            ballYSpeed += 2;
-        } else {
-            // Appliquer un malus : réduire la taille du paddle qui a touché la balle en dernier
-            if (lastHitByPaddle1) {
-                paddle1Height = Math.max(60, paddle1Height - 20); // Réduire la taille du paddle 1
-            } else {
-                paddle2Height = Math.max(60, paddle2Height - 20); // Réduire la taille du paddle 2
-            }
+        switch (BonusType) {
+            case 1:
+                ballXSpeed += (isBonus ? 5 : -2);  // Bonus : augmenter la vitesse, Malus : la diminuer
+                ballYSpeed += (isBonus ? 5 : -2);
+                break;
+            case 2:
+                if (lastHitByPaddle1) {
+                    controlsInvertedPaddle1 = !isBonus;  // Inverser les contrôles du joueur 1
+                    if (!isBonus) { // Si c'est un malus
+                        startMalusTimer(1);  // Démarrer le timer de malus pour le joueur 1
+                    }
+                } else {
+                    controlsInvertedPaddle2 = !isBonus;  // Inverser les contrôles du joueur 2
+                    if (!isBonus) { // Si c'est un malus
+                        startMalusTimer(2);  // Démarrer le timer de malus pour le joueur 2
+                    }
+                }
+                break;
+            // Ajoutez d'autres types de bonus/malus ici si nécessaire
+            case 3:
+                if (lastHitByPaddle1) {
+                    paddle1Height = Math.max(60, paddle1Height - 20); // Réduire la taille du paddle 1
+                } else {
+                    paddle2Height = Math.max(60, paddle2Height - 20); // Réduire la taille du paddle 2
+                }
         }
+    }
+
+    // Méthode pour démarrer le timer de malus
+    private void startMalusTimer(int player) {
+        malusTimer = new Timer(10000, evt -> {
+            if (player == 1) {
+                controlsInvertedPaddle1 = false;  // Rétablir les contrôles du joueur 1
+            } else {
+                controlsInvertedPaddle2 = false;  // Rétablir les contrôles du joueur 2
+            }
+            malusTimer.stop();  // Arrêter le timer de malus
+        });
+        malusTimer.setRepeats(false); // Exécuter une seule fois
+        malusTimer.start();  // Démarrer le timer
     }
 
     private void endGame() {
@@ -180,6 +231,9 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
         JOptionPane.showMessageDialog(this, winner, "Game Over", JOptionPane.INFORMATION_MESSAGE);
         timer.stop();  // Arrêter le jeu
         bonusTimer.stop();  // Arrêter le timer des bonus/malus
+        if (malusTimer != null) {
+            malusTimer.stop();  // Arrêter le timer de malus
+        }
     }
 
     @Override
