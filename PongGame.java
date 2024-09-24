@@ -2,6 +2,9 @@ import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
 import java.util.Random;
+import javax.sound.sampled.*;
+import java.io.File;
+import java.io.IOException;
 
 public class PongGame extends JPanel implements KeyListener, ActionListener {
     private int paddleWidth = 10;
@@ -33,6 +36,12 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
     // Variable pour suivre quel paddle a touché la balle en dernier
     private boolean lastHitByPaddle1 = false; 
 
+    // Variables pour les sons
+    private SoundPlayer paddleHitSound;
+    private SoundPlayer bonusSound;
+    private SoundPlayer malusSound;
+    private SoundPlayer ambianceSound;
+
     public PongGame() {
         this.setPreferredSize(new Dimension(500, 300));
         this.setBackground(Color.BLACK);
@@ -49,6 +58,15 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
         // Timer pour générer des bonus/malus toutes les 7 secondes
         bonusTimer = new Timer(7000, evt -> spawnBonus());
         bonusTimer.start();
+
+        // Charger les sons
+        paddleHitSound = new SoundPlayer("paddle.wav");
+        bonusSound = new SoundPlayer("bonus.wav");
+        malusSound = new SoundPlayer("malus.wav");
+        ambianceSound = new SoundPlayer("ambiance.wav");
+
+        // Jouer le son d'ambiance en boucle
+        ambianceSound.loop();
     }
 
     @Override
@@ -64,9 +82,9 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
         g.fillOval(ballX, ballY, ballDiameter, ballDiameter);
         
         // Afficher les scores
-        g.setFont(new Font("Arial", Font.BOLD, 20));  // Définir une police plus grande
-        g.drawString("Player 1: " + ScoreP1, 50, 30);  // Afficher le score du joueur 1
-        g.drawString("Player 2: " + ScoreP2, getWidth() - 150, 30);  // Afficher le score du joueur 2
+        g.setFont(new Font("Arial", Font.BOLD, 20));
+        g.drawString("Player 1: " + ScoreP1, 50, 30);
+        g.drawString("Player 2: " + ScoreP2, getWidth() - 150, 30);
         
         // Dessiner le bonus/malus s'il est actif
         if (bonusActive) {
@@ -77,7 +95,7 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
 
     public void actionPerformed(ActionEvent e) {
         if (ScoreP1 >= MAX_SCORE || ScoreP2 >= MAX_SCORE) {
-            endGame();  // Vérifier si l'un des joueurs a atteint le score maximal
+            endGame();
             return;
         }
         
@@ -91,13 +109,15 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
         // Paddle 1 touche la balle
         if (ballX <= paddleWidth && ballY + ballDiameter >= paddle1Y && ballY <= paddle1Y + paddle1Height) {
             ballXSpeed = -ballXSpeed;
-            lastHitByPaddle1 = true;
+        
+            paddleHitSound.play();  // Jouer le son quand la balle touche le paddle 1
         }
     
         // Paddle 2 touche la balle
         if (ballX >= getWidth() - paddleWidth - ballDiameter && ballY + ballDiameter >= paddle2Y && ballY <= paddle2Y + paddle2Height) {
             ballXSpeed = -ballXSpeed;
-            lastHitByPaddle1 = false;
+           
+            paddleHitSound.play();  // Jouer le son quand la balle touche le paddle 2
         }
     
         // Gérer les sorties de balle
@@ -109,13 +129,12 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
         if (bonusActive && ballX + ballDiameter >= bonusX && ballX <= bonusX + bonusWidth &&
             ballY + ballDiameter >= bonusY && ballY <= bonusY + bonusHeight) {
             applyBonusOrMalus();
-            bonusActive = false;  // Désactiver le bonus/malus après collision
+            bonusActive = false;
         }
     
         repaint();
     }
 
-    // Méthode pour déplacer la paddle 1 en fonction de la direction
     private void movePaddle1() {
         if (paddle1MovingUp && paddle1Y > 0) {
             paddle1Y -= 5;
@@ -125,7 +144,6 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
         }
     }
 
-    // Méthode pour déplacer la paddle 2 en fonction de la direction
     private void movePaddle2() {
         if (paddle2MovingUp && paddle2Y > 0) {
             paddle2Y -= 5;
@@ -136,55 +154,50 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
     }
 
     public void scoreP() {
-        if (ballX < 0) {  // Si la balle sort du côté gauche
-            ScoreP2 += 1;  // Le joueur 2 marque un point
-        } else if (ballX > getWidth()) {  // Si la balle sort du côté droit
-            ScoreP1 += 1;  // Le joueur 1 marque un point
+        if (ballX < 0) {
+            ScoreP2 += 1;
+        } else if (ballX > getWidth()) {
+            ScoreP1 += 1;
         }
         
-        // Réinitialiser la position de la balle
         ballX = getWidth() / 2 - ballDiameter / 2;
         ballY = getHeight() / 2 - ballDiameter / 2;
-        
-        // Réinitialiser la vitesse de la balle
         ballXSpeed = 5;
         ballYSpeed = 5;
     }
 
-    // Génération aléatoire d'un bonus/malus
     public void spawnBonus() {
         bonusX = random.nextInt(getWidth() - bonusWidth);
         bonusY = random.nextInt(getHeight() - bonusHeight);
-        isBonus = random.nextBoolean();  // Choisir si c'est un bonus ou un malus
-        bonusActive = true;  // Activer le bonus/malus
+        isBonus = random.nextBoolean();
+        bonusActive = true;
     }
 
-    // Appliquer les effets du bonus ou malus
     public void applyBonusOrMalus() {
         if (isBonus) {
-            // Appliquer un bonus : augmenter la vitesse de la balle
             ballXSpeed += 2;
             ballYSpeed += 2;
+            bonusSound.play();  // Jouer le son du bonus
         } else {
-            // Appliquer un malus : réduire la taille du paddle qui a touché la balle en dernier
             if (lastHitByPaddle1) {
-                paddle1Height = Math.max(60, paddle1Height - 20); // Réduire la taille du paddle 1
+                paddle1Height = Math.max(60, paddle1Height - 20);
             } else {
-                paddle2Height = Math.max(60, paddle2Height - 20); // Réduire la taille du paddle 2
+                paddle2Height = Math.max(60, paddle2Height - 20);
             }
+            malusSound.play();  // Jouer le son du malus
         }
     }
 
     private void endGame() {
         String winner = (ScoreP1 >= MAX_SCORE) ? "Player 1 wins!" : "Player 2 wins!";
         JOptionPane.showMessageDialog(this, winner, "Game Over", JOptionPane.INFORMATION_MESSAGE);
-        timer.stop();  // Arrêter le jeu
-        bonusTimer.stop();  // Arrêter le timer des bonus/malus
+        timer.stop();
+        bonusTimer.stop();
+        ambianceSound.stop();  // Arrêter le son d'ambiance à la fin du jeu
     }
 
     @Override
     public void keyPressed(KeyEvent e) {
-        // Paddle 1 (gauche)
         if (e.getKeyCode() == KeyEvent.VK_W) {
             paddle1MovingUp = true;
             paddle1MovingDown = false;
@@ -200,7 +213,6 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
             }
         }
 
-        // Paddle 2 (droite)
         if (e.getKeyCode() == KeyEvent.VK_UP) {
             paddle2MovingUp = true;
             paddle2MovingDown = false;
@@ -219,7 +231,6 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
 
     @Override
     public void keyReleased(KeyEvent e) {
-        // Paddle 1 (gauche)
         if (e.getKeyCode() == KeyEvent.VK_W) {
             paddle1MovingUp = false;
         }
@@ -230,7 +241,6 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
             paddle1MoveTimer.stop();
         }
 
-        // Paddle 2 (droite)
         if (e.getKeyCode() == KeyEvent.VK_UP) {
             paddle2MovingUp = false;
         }
@@ -246,9 +256,10 @@ public class PongGame extends JPanel implements KeyListener, ActionListener {
     public void keyTyped(KeyEvent e) {}
 
     public static void main(String[] args) {
-        JFrame frame = new JFrame("Pong Game with Bonus/Malus");
-        PongGame game = new PongGame();
-        frame.add(game);
+        JFrame frame = new JFrame("Pong Game with Sound");
+        PongGame pongGame = new PongGame();
+        frame.add(pongGame);
+        
         frame.pack();
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setVisible(true);
